@@ -1,4 +1,10 @@
 <resources>
     <string name="app_name">Death - Hone Your Intuition</string>
     <string name="guess_edit_text_hint">0</string>
+    <string name="guess_helper_text">Enter your guess here</string>
+    <string name="guess_reply_high">Your guess is higher than the actual age!</string>
+    <string name="guess_reply_low">Your guess is lower than the actual age!</string>
+    <string name="guess_reply_correct">You guessed correctly!</string>
+    <string name="previous_matches_prefix">Your previous matches:\n%1$s</string>
+    <string name="wins_and_losses">You won %1$d matches and lost %2$d matches</string>
 </resources>

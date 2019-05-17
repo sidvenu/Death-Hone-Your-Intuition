@@ -1,34 +1,53 @@
 package io.github.sidvenu.death_honeyourintuition;
 
+import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
-import android.os.AsyncTask;
+import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.preference.Preference;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.AppCompatEditText;
-import androidx.multidex.MultiDexApplication;
+import androidx.core.graphics.ColorUtils;
 
-import com.ibm.cloud.sdk.core.service.security.IamOptions;
-import com.ibm.watson.visual_recognition.v3.VisualRecognition;
-import com.ibm.watson.visual_recognition.v3.model.ClassifiedImages;
-import com.ibm.watson.visual_recognition.v3.model.ClassifyOptions;
-import com.ibm.watson.visual_recognition.v3.model.DetectFacesOptions;
-import com.ibm.watson.visual_recognition.v3.model.DetectedFaces;
-import com.rengwuxian.materialedittext.MaterialEditText;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 public class MainActivity extends AppCompatActivity {
+
+    String matches;
+    int colorSuccess, colorFailure;
+    int age;
+    int tries;
+    boolean isMatchComplete = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        EditText ageGuess = findViewById(R.id.guess_edit_text);
-        ageGuess.addTextChangedListener(new TextWatcher() {
+        generateAge();
+        resetTries();
+
+        colorSuccess = getResources().getColor(R.color.colorSuccess);
+        colorFailure = getResources().getColor(R.color.colorFailure);
+
+        // set the FAB to the top of the keyboard (if opened)
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+
+        final EditText ageGuessEditText = findViewById(R.id.guess_edit_text);
+        ageGuessEditText.addTextChangedListener(new TextWatcher() {
+            String lastText = "";
+
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
 
@@ -41,27 +60,144 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
-
+                if (!TextUtils.isEmpty(s) && Integer.valueOf(s.toString()) > 100) {
+                    Log.v("TAG", lastText);
+                    ageGuessEditText.setText(lastText);
+                    ageGuessEditText.setSelection(ageGuessEditText.getText().length());
+                } else lastText = s.toString();
             }
         });
 
-        IamOptions options = new IamOptions.Builder()
-                .apiKey("UILcys4LBj7acKZ-PyQgjauaU0KnAh4d-IRMDwkVV5P4")
-                .build();
+        final FloatingActionButton doneButton = findViewById(R.id.done_fab);
 
-        final VisualRecognition visualRecognition = new VisualRecognition("2018-03-19", options);
-
-        final DetectFacesOptions detectFacesOptions = new DetectFacesOptions.Builder()
-                .url("https://qph.fs.quoracdn.net/main-raw-246505832-fiulqsjebqiqozmsewlykdsploxnitxt.jpeg")
-                .build();
-        AsyncTask.execute(new Runnable() {
+        ageGuessEditText.setOnKeyListener(new View.OnKeyListener() {
             @Override
-            public void run() {
-                DetectedFaces result = visualRecognition.detectFaces(detectFacesOptions).execute().getResult();
-                Log.v("TAG", String.valueOf(result));
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if ((event.getAction() == KeyEvent.ACTION_DOWN) &&
+                        (keyCode == KeyEvent.KEYCODE_ENTER)) {
+                    doneButton.performClick();
+                    ageGuessEditText.clearFocus();
+                }
+                return false;
+            }
+        });
+
+        doneButton.setOnClickListener(new View.OnClickListener() {
+            @SuppressLint("SetTextI18n")
+            @Override
+            public void onClick(View v) {
+                if (!isMatchComplete) {
+                    tries--;
+                    if (tries == 0)
+                        isMatchComplete = true;
+                    int ageGuess = Integer.valueOf(ageGuessEditText.getText().toString());
+                    float failureRatio = Math.abs(ageGuess - age) / 100.0f;
+                    findViewById(R.id.root_view).setBackgroundColor(ColorUtils.blendARGB(colorSuccess, colorFailure, failureRatio));
+                    int guessReply;
+                    if (ageGuess - age > 0) {
+                        guessReply = R.string.guess_reply_high;
+                    } else if (ageGuess - age < 0) {
+                        guessReply = R.string.guess_reply_low;
+                    } else {
+                        guessReply = R.string.guess_reply_correct;
+                        isMatchComplete = true;
+                    }
+                    TextView guessReplyTextView = findViewById(R.id.guess_reply);
+                    guessReplyTextView.setText(guessReply);
+
+                    if (isMatchComplete) {
+                        if (ageGuess == age) {
+                            matches = matches.concat("W");
+                        } else {
+                            matches = matches.concat("L");
+                        }
+                        setPreviousMatches();
+                        setWinsAndLosses();
+                        doneButton.setImageResource(R.drawable.ic_baseline_refresh);
+                        disableEditText(ageGuessEditText);
+                    } else {
+                        guessReplyTextView.setText(getString(guessReply) + " You have " + tries + " tries left");
+                    }
+                } else {
+                    resetTries();
+                    doneButton.setImageResource(R.drawable.ic_baseline_done);
+                    enableEditText(ageGuessEditText);
+                    ageGuessEditText.setText(null);
+                    ageGuessEditText.requestFocus();
+                    generateAge();
+                    isMatchComplete = false;
+                    ((TextView) findViewById(R.id.guess_reply)).setText("");
+                }
+            }
+        });
+
+        findViewById(R.id.camera_fab).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
                 startActivity(new Intent(MainActivity.this, CameraActivity.class));
             }
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        SharedPreferences preferences = getPreferences(Context.MODE_PRIVATE);
+        matches = preferences.getString(Keys.MATCHES, "");
+        setPreviousMatches();
+        setWinsAndLosses();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        SharedPreferences preferences = getPreferences(Context.MODE_PRIVATE);
+        preferences.edit()
+                .putString(Keys.MATCHES, matches)
+                .apply();
+    }
+
+    private void setPreviousMatches() {
+        ((TextView) findViewById(R.id.previous_matches)).setText(
+                String.format(getString(R.string.previous_matches_prefix), matches.replaceAll(".(?!$)", "$0 "))
+        );
+    }
+
+    private void setWinsAndLosses() {
+        ((TextView) findViewById(R.id.wins_and_losses_number)).setText(
+                String.format(getString(R.string.wins_and_losses),
+                        matches.replace("L", "").length(),
+                        matches.replace("W", "").length()
+                )
+        );
+    }
+
+    private void resetTries() {
+        tries = 10;
+    }
+
+    private void generateAge() {
+        age = (int) (System.currentTimeMillis() % 101);
+    }
+
+    private void enableEditText(EditText editText) {
+        editText.setFocusableInTouchMode(true);
+        editText.setEnabled(true);
+        editText.setCursorVisible(true);
+        editText.setTextColor(getResources().getColor(android.R.color.white));
+    }
+
+    private void disableEditText(EditText editText) {
+        editText.setFocusable(false);
+        editText.setEnabled(false);
+        editText.setCursorVisible(false);
+        editText.setTextColor(getResources().getColor(android.R.color.darker_gray));
+    }
+
+    static class Keys {
+        static String MATCHES = "MATCHES";
     }
 
 }

@@ -12,9 +12,15 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
+        debug {
+            buildConfigField 'String', "ibmWatsonApiKey", ibmWatsonApiKey
+            resValue 'string', "ibm_watson_api_key", ibmWatsonApiKey
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            buildConfigField 'String', "ibmWatsonApiKey", ibmWatsonApiKey
+            resValue 'string', "ibm_watson_api_key", ibmWatsonApiKey
         }
     }
 }
