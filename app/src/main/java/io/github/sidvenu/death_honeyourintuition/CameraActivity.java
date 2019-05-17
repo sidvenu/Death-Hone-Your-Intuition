@@ -1,5 +1,6 @@
 package io.github.sidvenu.death_honeyourintuition;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
@@ -15,7 +16,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Rect;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -23,10 +23,12 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.TextPaint;
 import android.util.Log;
+import android.view.View;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.ibm.cloud.sdk.core.service.security.IamOptions;
 import com.ibm.watson.visual_recognition.v3.VisualRecognition;
 import com.ibm.watson.visual_recognition.v3.model.DetectFacesOptions;
@@ -41,8 +43,6 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.Objects;
 
 public class CameraActivity extends AppCompatActivity {
 
@@ -54,34 +54,56 @@ public class CameraActivity extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
-        ArrayList<String> list = new ArrayList<>();
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-            list.add(Manifest.permission.CAMERA);
+
+        updatePermissionGrantStatus(isPermissionsGranted());
+
+        if (!isPermissionsGranted()) {
+            ArrayList<String> list = new ArrayList<>();
+            if (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.CAMERA)
+                    != PackageManager.PERMISSION_GRANTED) {
+                list.add(Manifest.permission.CAMERA);
+            }
+            if (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            }
+
+            Object[] arr = list.toArray();
+            if (arr != null && list.size() > 0)
+                ActivityCompat.requestPermissions(this,
+                        Arrays.copyOf(arr,
+                                arr.length,
+                                String[].class),
+                        REQUEST_PERMISSIONS);
         }
-        if (ContextCompat.checkSelfPermission(this,
+    }
+
+    private void updatePermissionGrantStatus(boolean permissionGranted) {
+        FloatingActionButton pictureFab = findViewById(R.id.picture_fab);
+        if (permissionGranted) {
+            pictureFab.setBackgroundColor(getResources().getColor(R.color.colorBackground));
+            IamOptions options = new IamOptions.Builder()
+                    .apiKey(BuildConfig.ibmWatsonApiKey)
+                    .build();
+            visualRecognition = new VisualRecognition("2018-03-19", options);
+            pictureFab.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    dispatchTakePictureIntent();
+                }
+            });
+        } else {
+            pictureFab.setBackgroundColor(getResources().getColor(android.R.color.darker_gray));
+        }
+    }
+
+    private boolean isPermissionsGranted() {
+        return ContextCompat.checkSelfPermission(this,
+                Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        }
-
-        IamOptions options = new IamOptions.Builder()
-                .apiKey(BuildConfig.ibmWatsonApiKey)
-                .build();
-
-        visualRecognition = new VisualRecognition("2018-03-19", options);
-        if (list.size() == 0) {
-            dispatchTakePictureIntent();
-        }
-
-        Object[] arr = list.toArray();
-        if (arr != null && list.size() > 0)
-            ActivityCompat.requestPermissions(this,
-                    Arrays.copyOf(arr,
-                            arr.length,
-                            String[].class),
-                    REQUEST_PERMISSIONS);
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     private void dispatchTakePictureIntent() {
@@ -106,6 +128,10 @@ public class CameraActivity extends AppCompatActivity {
             Bitmap imageBitmap = (Bitmap) extras.get("data");
             imageView.setImageBitmap(imageBitmap);*/
             try {
+                ((ImageView)findViewById(R.id.picture)).setImageBitmap(null);
+                findViewById(R.id.image_load_progress).setVisibility(View.VISIBLE);
+                findViewById(R.id.camera_press_helper).setVisibility(View.INVISIBLE);
+
                 final DetectFacesOptions detectFacesOptions = new DetectFacesOptions.Builder()
                         .imagesFile(photoFile)
                         .build();
@@ -129,34 +155,37 @@ public class CameraActivity extends AppCompatActivity {
                             BitmapFactory.Options opt = new BitmapFactory.Options();
                             opt.inMutable = true;
                             final Bitmap b = BitmapFactory.decodeStream(new FileInputStream(photoFile), null, opt);
-                            Canvas canvas = new Canvas(b);
-                            ImageWithFaces image = result.getImages().get(0);
-                            for (Face f : image.getFaces()) {
-                                long ageNum = Math.round((f.getAge().getMax() + f.getAge().getMin()) / 2.0);
-                                FaceLocation location = f.getFaceLocation();
-                                canvas.drawRect(location.getLeft().floatValue(),
-                                        location.getTop().floatValue(),
-                                        (float) (location.getLeft() + location.getWidth()),
-                                        (float) (location.getTop() + location.getHeight()),
-                                        p
-                                );
+                            if (b != null) {
+                                Canvas canvas = new Canvas(b);
+                                ImageWithFaces image = result.getImages().get(0);
+                                for (Face f : image.getFaces()) {
+                                    long ageNum = Math.round((f.getAge().getMax() + f.getAge().getMin()) / 2.0);
+                                    FaceLocation location = f.getFaceLocation();
+                                    canvas.drawRect(location.getLeft().floatValue(),
+                                            location.getTop().floatValue(),
+                                            (float) (location.getLeft() + location.getWidth()),
+                                            (float) (location.getTop() + location.getHeight()),
+                                            p
+                                    );
 
-                                String age = "Age: " + ageNum;
-                                int worldLifeExpectancy = 72;
-                                String deathYear = "Death Year: "
-                                        + (Calendar.getInstance().get(Calendar.YEAR) + worldLifeExpectancy - ageNum);
-                                String gender = "Gender: " + (("MALE".equals(f.getGender().getGender())) ? "Male" : "Female");
-                                canvas.drawText(age + "  " + gender, location.getLeft().floatValue(), (float) (location.getTop() - textHeight / 2), textPaint);
-                                canvas.drawText(deathYear, location.getLeft().floatValue(), (float) (location.getTop() + location.getHeight() + textHeight), textPaint);
-                                //canvas.drawText(age+"  "+gender, 0, 20, textPaint);
-                            }
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    ImageView picture = findViewById(R.id.picture);
-                                    picture.setImageBitmap(b);
+                                    String age = "Age: " + ageNum;
+                                    int worldLifeExpectancy = 72;
+                                    String deathYear = "Death Year: "
+                                            + (Calendar.getInstance().get(Calendar.YEAR) + worldLifeExpectancy - ageNum);
+                                    String gender = "Gender: " + (("MALE".equals(f.getGender().getGender())) ? "Male" : "Female");
+                                    canvas.drawText(age + "  " + gender, location.getLeft().floatValue(), (float) (location.getTop() - textHeight / 2), textPaint);
+                                    canvas.drawText(deathYear, location.getLeft().floatValue(), (float) (location.getTop() + location.getHeight() + textHeight), textPaint);
+                                    //canvas.drawText(age+"  "+gender, 0, 20, textPaint);
                                 }
-                            });
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        findViewById(R.id.image_load_progress).setVisibility(View.INVISIBLE);
+                                        ImageView picture = findViewById(R.id.picture);
+                                        picture.setImageBitmap(b);
+                                    }
+                                });
+                            }
                         } catch (FileNotFoundException e) {
                             e.printStackTrace();
                         }
@@ -171,7 +200,7 @@ public class CameraActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
-                                           String[] permissions, int[] grantResults) {
+                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
         // If request is cancelled, the result arrays are empty.
         if (requestCode == REQUEST_PERMISSIONS) {
             if (grantResults.length > 0
@@ -179,7 +208,7 @@ public class CameraActivity extends AppCompatActivity {
                     && (grantResults.length != 2 || grantResults[1] == PackageManager.PERMISSION_GRANTED)) {
                 // permission was granted, yay! Do the
                 // contacts-related task you need to do.
-                dispatchTakePictureIntent();
+                updatePermissionGrantStatus(true);
             } else {
                 Toast.makeText(this, "Permission denied. Please grant permission and try again", Toast.LENGTH_LONG).show();
             }

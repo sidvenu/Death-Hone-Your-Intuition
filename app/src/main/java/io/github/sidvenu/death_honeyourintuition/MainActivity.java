@@ -14,6 +14,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -70,18 +71,6 @@ public class MainActivity extends AppCompatActivity {
 
         final FloatingActionButton doneButton = findViewById(R.id.done_fab);
 
-        ageGuessEditText.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if ((event.getAction() == KeyEvent.ACTION_DOWN) &&
-                        (keyCode == KeyEvent.KEYCODE_ENTER)) {
-                    doneButton.performClick();
-                    ageGuessEditText.clearFocus();
-                }
-                return false;
-            }
-        });
-
         doneButton.setOnClickListener(new View.OnClickListener() {
             @SuppressLint("SetTextI18n")
             @Override
@@ -128,6 +117,19 @@ public class MainActivity extends AppCompatActivity {
                     isMatchComplete = false;
                     ((TextView) findViewById(R.id.guess_reply)).setText("");
                 }
+            }
+        });
+
+        ageGuessEditText.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    Log.v("TAG", "down pressed");
+                    doneButton.performClick();
+                    ageGuessEditText.clearFocus();
+                    return false;
+                }
+                return false;
             }
         });
 
