@@ -4,9 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.os.Bundle;
-import android.preference.Preference;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -61,7 +59,13 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
-                if (!TextUtils.isEmpty(s) && Integer.valueOf(s.toString()) > 100) {
+                if (!TextUtils.isEmpty(s) &&
+                        (
+                                !MainActivity.isInteger(s.toString()) ||
+                                        Integer.valueOf(s.toString()) > 100 ||
+                                        Integer.valueOf(s.toString()) < 0
+                        )
+                ) {
                     Log.v("TAG", lastText);
                     ageGuessEditText.setText(lastText);
                     ageGuessEditText.setSelection(ageGuessEditText.getText().length());
@@ -75,6 +79,8 @@ public class MainActivity extends AppCompatActivity {
             @SuppressLint("SetTextI18n")
             @Override
             public void onClick(View v) {
+                if (!MainActivity.isInteger(ageGuessEditText.getText().toString()))
+                    return;
                 if (!isMatchComplete) {
                     tries--;
                     if (tries == 0)
@@ -139,6 +145,22 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(MainActivity.this, CameraActivity.class));
             }
         });
+    }
+
+    public static boolean isInteger(String s) {
+        return isInteger(s, 10);
+    }
+
+    public static boolean isInteger(String s, int radix) {
+        if (s.isEmpty()) return false;
+        for (int i = 0; i < s.length(); i++) {
+            if (i == 0 && s.charAt(i) == '-') {
+                if (s.length() == 1) return false;
+                else continue;
+            }
+            if (Character.digit(s.charAt(i), radix) < 0) return false;
+        }
+        return true;
     }
 
     @Override
